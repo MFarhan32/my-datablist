@@ -1,0 +1,31 @@
+version: '3.9'
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    env_file:
+      - ./server/.env.example
+    ports:
+      - '5000:5000'
+    depends_on:
+      - mongo
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    env_file:
+      - ./client/.env.example
+    ports:
+      - '5173:5173'
+    depends_on:
+      - server
+volumes:
+  mongo_data:
