@@ -1,4 +1,5 @@
 import { Parser } from 'json2csv';
+import mongoose from 'mongoose';
 import { List } from '../models/List.js';
 import { DataRecord } from '../models/DataRecord.js';
 import { OperationsLog } from '../models/OperationsLog.js';
@@ -12,9 +13,16 @@ const ensureListOwner = async (listId, userId) => {
   return list;
 };
 
+const safeObject = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const safeObjectId = (value) => {
+  const id = String(value);
+  if (!mongoose.isValidObjectId(id)) throw new AppError(400, 'Invalid id');
+  return new mongoose.Types.ObjectId(id);
+};
+
 export const getRecords = async (req, res, next) => {
   try {
-    const { listId } = req.params;
+    const listId = String(req.params.listId);
     const { page = 1, limit = constants.defaultPageSize, search = '', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     await ensureListOwner(listId, req.user.userId);
 
@@ -34,9 +42,9 @@ export const getRecords = async (req, res, next) => {
 
 export const createRecord = async (req, res, next) => {
   try {
-    const { listId } = req.params;
+    const listId = String(req.params.listId);
     const list = await ensureListOwner(listId, req.user.userId);
-    const record = await DataRecord.create({ listId, data: req.body.data || {} });
+    const record = await DataRecord.create({ listId, data: safeObject(req.body.data) });
     list.recordCount += 1;
     list.columns = [...new Set([...list.columns, ...Object.keys(record.data || {})])];
     await list.save();
@@ -50,10 +58,13 @@ export const createRecord = async (req, res, next) => {
 
 export const updateRecord = async (req, res, next) => {
   try {
-    const { listId, id } = req.params;
+    const listId = String(req.params.listId);
+    const id = String(req.params.id);
     await ensureListOwner(listId, req.user.userId);
-    const record = await DataRecord.findOneAndUpdate({ _id: id, listId }, { data: req.body.data || {} }, { new: true });
-    if (!record) throw new AppError(404, 'Record not found');
+    const record = await DataRecord.findById(safeObjectId(id));
+    if (!record || String(record.listId) !== listId) throw new AppError(404, 'Record not found');
+    record.data = safeObject(req.body.data);
+    await record.save();
     await OperationsLog.create({ userId: req.user.userId, action: 'update_record', target: `record:${record.id}` });
     req.io?.to(req.user.userId).emit('record:updated', record);
     res.json(record);
@@ -64,7 +75,8 @@ export const updateRecord = async (req, res, next) => {
 
 export const deleteRecord = async (req, res, next) => {
   try {
-    const { listId, id } = req.params;
+    const listId = String(req.params.listId);
+    const id = String(req.params.id);
     const list = await ensureListOwner(listId, req.user.userId);
     const record = await DataRecord.findOneAndDelete({ _id: id, listId });
     if (!record) throw new AppError(404, 'Record not found');
@@ -80,7 +92,7 @@ export const deleteRecord = async (req, res, next) => {
 
 export const bulkDeleteRecords = async (req, res, next) => {
   try {
-    const { listId } = req.params;
+    const listId = String(req.params.listId);
     const { ids = [] } = req.body;
     const list = await ensureListOwner(listId, req.user.userId);
     const result = await DataRecord.deleteMany({ listId, _id: { $in: ids } });
@@ -95,7 +107,7 @@ export const bulkDeleteRecords = async (req, res, next) => {
 
 export const exportRecords = async (req, res, next) => {
   try {
-    const { listId } = req.params;
+    const listId = String(req.params.listId);
     const { format = 'json' } = req.query;
     await ensureListOwner(listId, req.user.userId);
     const records = await DataRecord.find({ listId }).lean();
@@ -116,7 +128,7 @@ export const exportRecords = async (req, res, next) => {
 
 export const detectDuplicates = async (req, res, next) => {
   try {
-    const { listId } = req.params;
+    const listId = String(req.params.listId);
     const { keys = [] } = req.body;
     await ensureListOwner(listId, req.user.userId);
     const records = await DataRecord.find({ listId });

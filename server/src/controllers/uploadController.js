@@ -6,7 +6,7 @@ import { constants } from '../config/constants.js';
 
 export const uploadCsv = async (req, res, next) => {
   try {
-    const { listId } = req.params;
+    const listId = String(req.params.listId);
     if (!req.file) throw new AppError(400, 'CSV file is required');
     const list = await List.findOne({ _id: listId, ownerId: req.user.userId });
     if (!list) throw new AppError(404, 'List not found');

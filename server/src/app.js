@@ -3,7 +3,6 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.js';
 import listRoutes from './routes/lists.js';
 import recordRoutes from './routes/records.js';
@@ -26,7 +25,6 @@ export const createApp = (io) => {
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 100 }));
   app.use(morgan('dev'));
   app.use(express.json({ limit: '2mb' }));
-  app.use(cookieParser());
 
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
   app.use('/api/auth', authRoutes);

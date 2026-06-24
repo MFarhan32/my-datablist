@@ -9,9 +9,13 @@ const generateTokens = (userId) => ({
   refreshToken: jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: constants.refreshExpiresIn }),
 });
 
+const safeString = (value) => (typeof value === 'string' ? value.trim() : '');
+
 export const register = async (req, res, next) => {
   try {
-    const { email, password, name } = req.body;
+    const email = safeString(req.body.email).toLowerCase();
+    const password = safeString(req.body.password);
+    const name = safeString(req.body.name);
     const exists = await User.findOne({ email });
     if (exists) throw new AppError(409, 'Email already registered');
     const passwordHash = await bcrypt.hash(password, 12);
@@ -27,7 +31,8 @@ export const register = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const email = safeString(req.body.email).toLowerCase();
+    const password = safeString(req.body.password);
     const user = await User.findOne({ email });
     if (!user) throw new AppError(401, 'Invalid credentials');
     const isMatch = await bcrypt.compare(password, user.passwordHash);
